@@ -11,7 +11,7 @@
 
 规则地址：<https://raw.githubusercontent.com/dreamrer/Shadowrocket-ADBlock-Rules/refs/heads/main/sr_top500_banlist_ad.conf>
 
-![二维码](https://johnshall.github.io/Shadowrocket-ADBlock-Rules-Forever/figure/sr_top500_banlist_ad.png)
+![二维码](https://github.com/dreamrer/Shadowrocket-ADBlock-Rules/blob/main/figure/sr_top500_banlist_ad.png)
 
 ## 白名单过滤 + 广告
 
@@ -23,7 +23,7 @@
 
 规则地址：<https://raw.githubusercontent.com/dreamrer/Shadowrocket-ADBlock-Rules/refs/heads/main/sr_top500_whitelist_ad.conf>
 
-![二维码](https://johnshall.github.io/Shadowrocket-ADBlock-Rules-Forever/figure/sr_top500_whitelist_ad.png)
+![二维码](https://github.com/dreamrer/Shadowrocket-ADBlock-Rules/blob/main/figure/sr_top500_whitelist_ad.png)
 
 
 ## 黑名单过滤
@@ -36,7 +36,7 @@
 
 规则地址：<https://raw.githubusercontent.com/dreamrer/Shadowrocket-ADBlock-Rules/refs/heads/main/sr_top500_banlist.conf>
 
-![二维码](https://johnshall.github.io/Shadowrocket-ADBlock-Rules-Forever/figure/sr_top500_banlist.png)
+![二维码](https://github.com/dreamrer/Shadowrocket-ADBlock-Rules/blob/main/figure/sr_top500_banlist.png)
 
 
 ## 白名单过滤
@@ -49,7 +49,7 @@
 
 规则地址：<https://raw.githubusercontent.com/dreamrer/Shadowrocket-ADBlock-Rules/refs/heads/main/sr_top500_whitelist.conf>
 
-![二维码](https://johnshall.github.io/Shadowrocket-ADBlock-Rules-Forever/figure/sr_top500_whitelist.png)
+![二维码](https://github.com/dreamrer/Shadowrocket-ADBlock-Rules/blob/main/figure/sr_top500_whitelist.png)
 
 
 ## 国内外划分 + 广告
@@ -58,7 +58,7 @@
 
 规则地址：<https://raw.githubusercontent.com/dreamrer/Shadowrocket-ADBlock-Rules/refs/heads/main/sr_cnip_ad.conf>
 
-![二维码](https://johnshall.github.io/Shadowrocket-ADBlock-Rules-Forever/figure/sr_cnip_ad.png)
+![二维码](https://github.com/dreamrer/Shadowrocket-ADBlock-Rules/blob/main/figure/sr_cnip_ad.png)
 
 
 ## 国内外划分
@@ -67,7 +67,7 @@
 
 规则地址：<https://raw.githubusercontent.com/dreamrer/Shadowrocket-ADBlock-Rules/refs/heads/main/sr_cnip.conf>
 
-![二维码](https://johnshall.github.io/Shadowrocket-ADBlock-Rules-Forever/figure/sr_cnip.png)
+![二维码](https://github.com/dreamrer/Shadowrocket-ADBlock-Rules/blob/main/figure/sr_cnip.png)
 
 
 ## 直连去广告
@@ -79,7 +79,7 @@
 
 规则地址：<https://raw.githubusercontent.com/dreamrer/Shadowrocket-ADBlock-Rules/refs/heads/main/sr_direct_banad.conf>
 
-![二维码](https://johnshall.github.io/Shadowrocket-ADBlock-Rules-Forever/figure/sr_direct_banad.png)
+![二维码](https://github.com/dreamrer/Shadowrocket-ADBlock-Rules/blob/main/figure/sr_direct_banad.png)
 
 
 ## 代理去广告
@@ -92,7 +92,7 @@
 
 规则地址：<https://raw.githubusercontent.com/dreamrer/Shadowrocket-ADBlock-Rules/refs/heads/main/sr_proxy_banad.conf>
 
-![二维码](https://johnshall.github.io/Shadowrocket-ADBlock-Rules-Forever/figure/sr_proxy_banad.png)
+![二维码](https://github.com/dreamrer/Shadowrocket-ADBlock-Rules/blob/main/figure/sr_proxy_banad.png)
 
 
 ## 仅去广告规则
@@ -103,12 +103,11 @@
 
 规则地址：<https://raw.githubusercontent.com/dreamrer/Shadowrocket-ADBlock-Rules/refs/heads/main/sr_ad_only.conf>
 
-![二维码](https://johnshall.github.io/Shadowrocket-ADBlock-Rules-Forever/figure/sr_ad_only.png)
+![二维码](https://github.com/dreamrer/Shadowrocket-ADBlock-Rules/blob/main/figure/sr_ad_only.png)
 
 
 ----------------------------------------
 
-以下规则基于 [blackmatrix7/ios_rule_script](https://github.com/blackmatrix7/ios_rule_script) 生成： 
 
 ## 懒人配置
 
@@ -120,7 +119,7 @@
 
 规则地址：<https://raw.githubusercontent.com/dreamrer/Shadowrocket-ADBlock-Rules/refs/heads/main/lazy.conf>
 
-![二维码](https://johnshall.github.io/Shadowrocket-ADBlock-Rules-Forever/figure/lazy.png)
+![二维码](https://github.com/dreamrer/Shadowrocket-ADBlock-Rules/blob/main/figure/lazy.png)
 
 
 ## 懒人配置-含策略组
@@ -135,4 +134,4 @@
 
 规则地址：<https://raw.githubusercontent.com/dreamrer/Shadowrocket-ADBlock-Rules/refs/heads/main/lazy_group.conf>
 
-![二维码](https://johnshall.github.io/Shadowrocket-ADBlock-Rules-Forever/figure/lazy_group.png)
+![二维码](https://github.com/dreamrer/Shadowrocket-ADBlock-Rules/blob/main/figure/lazy_group.png)
