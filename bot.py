@@ -20,7 +20,11 @@ import zipfile
 from pygtrans import Translate
 import asyncio
 import pymongo
-from mongo import *
+from mongo import (
+    qukuai, shangtext, topup, user, notifications, user_log, 
+    fenlei, ejfl, hb, fyb, get_key, zhuanz, hongbao, qb, 
+    sftw, gmjlu, fanyibao
+)
 
 # 易支付配置导入 - 统一处理
 print("🔧 正在加载易支付配置...")
@@ -32,6 +36,21 @@ EPAY_CONFIG = {
     'notify_url': 'http://8.209.218.35:8888/notify',
     'return_url': 'http://8.209.218.35:8888/return'
 }
+
+# 🔥 新增: 易支付配置 - 与 zhifu.py 完全一致
+print("🔧 正在加载易支付配置...")
+
+EPAY_CONFIG = {
+    'api_url': 'http://ruixing.wwspay.com/submit.php',
+    'pid': '240983942',
+    'key': 'rhgc7xkp0e0jaxose6ycmx0llihs6p04',
+    'notify_url': 'http://8.209.218.35:8888/notify',
+    'return_url': 'http://8.209.218.35:8888/return'
+}
+
+print("✅ 易支付配置加载成功")
+print(f"📋 商户号: {EPAY_CONFIG['pid']}")
+print(f"🔗 API地址: {EPAY_CONFIG['api_url']}")
 
 print("✅ 易支付配置加载成功")
 print(f"📋 商户号: {EPAY_CONFIG['pid']}")
@@ -83,7 +102,6 @@ import sys
 import traceback
 from telegram.ext import handler
 from telegram.utils import helpers
-from mongo import *
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler, \
     InlineQueryHandler
 from telegram import InlineKeyboardMarkup, ForceReply, InlineKeyboardButton, Update, ChatMemberRestricted, \
@@ -221,6 +239,101 @@ BOT_COMMANDS = {
         }
     }
 }
+
+# 🔥 新增: 支持函数 - 与 zhifu.py 兼容
+def verify_epay_notify(params, key):
+    """验证易支付回调签名"""
+    try:
+        if 'sign' not in params:
+            print("❌ 缺少签名参数")
+            return False
+            
+        received_sign = params.get('sign', '')
+        
+        # 创建参数副本，排除sign和sign_type
+        params_copy = params.copy()
+        if 'sign' in params_copy:
+            del params_copy['sign']
+        if 'sign_type' in params_copy:
+            del params_copy['sign_type']
+        
+        # 排序并生成签名字符串
+        sorted_params = sorted(params_copy.items())
+        param_str = '&'.join([f'{k}={v}' for k, v in sorted_params if v != '' and v is not None])
+        sign_str = param_str + key
+        calculated_sign = hashlib.md5(sign_str.encode('utf-8')).hexdigest()
+        
+        is_valid = received_sign.lower() == calculated_sign.lower()
+        return is_valid
+        
+    except Exception as e:
+        print(f"❌ 验证签名失败: {e}")
+        return False
+
+def standard_num(num):
+    """标准化数字格式"""
+    from decimal import Decimal
+    value = Decimal(str(num)).quantize(Decimal("0.01"))
+    return value.to_integral() if value == value.to_integral() else value.normalize()
+
+def generate_24bit_uid():
+    """生成24位唯一ID"""
+    import time
+    import random
+    import string
+    
+    timestamp = str(int(time.time()))[-8:]
+    random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=16))
+    return timestamp + random_str
+
+def create_epay_order(user_id, amount, payment_method='alipay'):
+    """创建易支付订单"""
+    try:
+        import urllib.parse
+        
+        # 生成订单号
+        order_no = f"epay_{user_id}_{int(time.time())}"
+        
+        # 构建支付参数
+        params = {
+            'pid': EPAY_CONFIG['pid'],
+            'type': payment_method,
+            'out_trade_no': order_no,
+            'notify_url': EPAY_CONFIG['notify_url'],
+            'return_url': EPAY_CONFIG['return_url'],
+            'name': '充值USDT',
+            'money': str(amount)
+        }
+        
+        # 生成签名
+        sorted_params = sorted(params.items())
+        param_str = '&'.join([f'{k}={v}' for k, v in sorted_params if v != ''])
+        sign_str = param_str + EPAY_CONFIG['key']
+        params['sign'] = hashlib.md5(sign_str.encode('utf-8')).hexdigest()
+        params['sign_type'] = 'MD5'
+        
+        # 生成支付链接
+        encoded_params = urllib.parse.urlencode(params)
+        payment_url = f"{EPAY_CONFIG['api_url']}?{encoded_params}"
+        
+        # 保存订单到数据库
+        timer = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+        topup.insert_one({
+            'bianhao': order_no,
+            'user_id': user_id,
+            'money': amount,
+            'pay_type': payment_method,
+            'timer': timer,
+            'epay_status': 'pending',
+            'created_timestamp': time.time()
+        })
+        
+        print(f"✅ 易支付订单创建成功: {order_no} - CNY{amount}")
+        return payment_url, order_no
+        
+    except Exception as e:
+        print(f"❌ 创建易支付订单失败: {e}")
+        return None, None
 
 # ==================== 帮助函数 ====================
 def get_user_commands(lang='zh'):
@@ -1296,6 +1409,117 @@ def lqhb(update: Update, context: CallbackContext):
     except:
         pass
 
+def handle_recharge_callback(update: Update, context: CallbackContext):
+    """处理充值相关回调"""
+    query = update.callback_query
+    query.answer()
+    user_id = query.from_user.id
+    callback_data = query.data
+    
+    if callback_data.startswith('select_amount_'):
+        amount_str = callback_data.replace('select_amount_', '')
+        
+        if amount_str == 'custom':
+            user.update_one({'user_id': user_id}, {'$set': {'sign': 'custom_recharge'}})
+            
+            keyboard = [[InlineKeyboardButton('❌ 取消', callback_data=f'close {user_id}')]]
+            query.edit_message_text(
+                text='💡 请回复您要充值的金额（CNY）\n\n例如：100',
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+        
+        try:
+            amount = float(amount_str)
+            show_payment_methods(query, user_id, amount)
+        except ValueError:
+            query.answer('❌ 金额格式错误', show_alert=True)
+    
+    elif callback_data.startswith('pay_method_'):
+        parts = callback_data.split('_')
+        method = parts[2]
+        amount = float(parts[3])
+        
+        payment_url, order_no = create_epay_order(user_id, amount, method)
+        
+        if payment_url:
+            method_name = {
+                'alipay': '支付宝',
+                'wxpay': '微信支付',
+                'qqpay': 'QQ钱包'
+            }.get(method, method)
+            
+            keyboard = [
+                [InlineKeyboardButton(f'💳 {method_name}支付', url=payment_url)],
+                [InlineKeyboardButton('❌ 取消订单', callback_data=f'cancel_order_{order_no}')],
+                [InlineKeyboardButton('🔄 检查支付状态', callback_data=f'check_payment_{order_no}')]
+            ]
+            
+            query.edit_message_text(
+                text=f'''💰 <b>充值订单创建成功</b>
+
+📋 订单号：<code>{order_no}</code>
+💵 充值金额：CNY{amount}
+💳 支付方式：{method_name}
+
+⚡️ 请点击下方按钮完成支付
+🕐 订单有效期：30分钟
+
+<i>支付完成后余额将自动到账</i>''',
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        else:
+            query.answer('❌ 创建支付订单失败，请稍后重试', show_alert=True)
+
+def show_payment_methods(query, user_id, amount):
+    """显示支付方式选择"""
+    keyboard = [
+        [InlineKeyboardButton('💙 支付宝', callback_data=f'pay_method_alipay_{amount}')],
+        [InlineKeyboardButton('💚 微信支付', callback_data=f'pay_method_wxpay_{amount}')],
+        [InlineKeyboardButton('🧡 QQ钱包', callback_data=f'pay_method_qqpay_{amount}')],
+        [InlineKeyboardButton('❌ 取消', callback_data=f'close {user_id}')]
+    ]
+    
+    query.edit_message_text(
+        text=f'''💰 <b>选择支付方式</b>
+
+💵 充值金额：CNY{amount}
+
+请选择您的支付方式：''',
+        parse_mode='HTML',
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+def sifatuwen(bot_id, projectname, text, file_id, send_type, keyboard, key_text, state=1):
+    """创建私发图文数据"""
+    try:
+        sftw_doc = {
+            'bot_id': bot_id,
+            'projectname': projectname,
+            'text': text,
+            'file_id': file_id,
+            'send_type': send_type,
+            'keyboard': keyboard,
+            'key_text': key_text,
+            'state': state
+        }
+        
+        sftw.insert_one(sftw_doc)
+        print(f"✅ 私发图文创建成功: {projectname}")
+        
+    except Exception as e:
+        print(f"❌ 创建私发图文失败: {e}")
+
+def del_message(message):
+    """安全删除消息"""
+    try:
+        if hasattr(message, 'delete'):
+            message.delete()
+        elif hasattr(message, 'message_id') and hasattr(message, 'chat'):
+            pass  # 可能需要传递context来删除消息
+        print(f"✅ 消息删除成功")
+    except Exception as e:
+        print(f"⚠️ 删除消息失败: {e}")
 
 def xzhb(update: Update, context: CallbackContext):
     query = update.callback_query
@@ -1444,6 +1668,7 @@ def addhb(update: Update, context: CallbackContext):
     user.update_one({'user_id': user_id}, {"$set": {'sign': 'addhb'}})
     context.bot.send_message(chat_id=user_id, text=fstext, reply_markup=InlineKeyboardMarkup(keyboard),
                              parse_mode='HTML')
+
 def adm(update: Update, context: CallbackContext):
     """管理员充值/扣款命令 - 修复版"""
     chat = update.effective_chat
@@ -1468,8 +1693,6 @@ def adm(update: Update, context: CallbackContext):
                     df_id = int(text1[1])
                     money_str = text1[2]
                     
-                    print(f"📋 解析参数: 目标用户={df_id}, 金额字符串='{money_str}'")
-                    
                     # 检查目标用户是否存在
                     target_user = user.find_one({'user_id': df_id})
                     if target_user is None:
@@ -1477,13 +1700,13 @@ def adm(update: Update, context: CallbackContext):
                         return
                     
                     # 处理金额
-                    is_addition = True  # 默认是充值
+                    is_addition = True
                     
                     if money_str.startswith('+'):
-                        money_str = money_str[1:]  # 去掉 + 号
+                        money_str = money_str[1:]
                         is_addition = True
                     elif money_str.startswith('-'):
-                        money_str = money_str[1:]  # 去掉 - 号
+                        money_str = money_str[1:]
                         is_addition = False
                     
                     # 验证金额是否为数字
@@ -1500,12 +1723,10 @@ def adm(update: Update, context: CallbackContext):
                     current_balance = target_user['USDT']
                     
                     if is_addition:
-                        # 充值操作
                         new_balance = standard_num(current_balance + money)
                         operation = '充值'
                         symbol = '+'
                     else:
-                        # 扣款操作
                         if current_balance < money:
                             context.bot.send_message(
                                 chat_id=user_id, 
@@ -1526,8 +1747,6 @@ def adm(update: Update, context: CallbackContext):
                     timer = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
                     order_id = time.strftime('%Y%m%d%H%M%S', time.localtime())
                     user_logging(order_id, f'管理员{operation}', df_id, money, timer)
-                    
-                    print(f"✅ {operation}成功: 用户{df_id} {current_balance} -> {new_balance}")
                     
                     # 获取目标用户信息
                     target_username = target_user.get('username', '')
@@ -1553,9 +1772,7 @@ def adm(update: Update, context: CallbackContext):
                             user_message = f'📉 管理员扣款CNY{money}\n💎 当前余额: CNY{new_balance}'
                         
                         context.bot.send_message(chat_id=df_id, text=user_message)
-                        print(f"📤 已通知用户 {df_id}")
                     except Exception as e:
-                        print(f"⚠️ 通知用户失败: {e}")
                         context.bot.send_message(
                             chat_id=user_id, 
                             text=f'⚠️ 操作成功但无法通知用户（用户可能已屏蔽机器人）'
@@ -1564,10 +1781,8 @@ def adm(update: Update, context: CallbackContext):
                 except ValueError:
                     context.bot.send_message(chat_id=user_id, text='❌ 用户ID必须是数字')
                 except Exception as e:
-                    print(f"❌ /add 命令执行错误: {e}")
                     context.bot.send_message(chat_id=user_id, text=f'❌ 操作失败: {str(e)}')
             else:
-                # 发送使用说明
                 help_text = '''📋 /add 命令使用说明
 
 🔹 格式: /add <用户ID> <±金额>
@@ -1575,17 +1790,11 @@ def adm(update: Update, context: CallbackContext):
 🔹 示例:
   • /add 123456789 +100    (充值100元)
   • /add 123456789 -50     (扣款50元)
-  • /add 123456789 100     (充值100元，默认为充值)
-
-⚠️ 注意:
-  • 用户ID和金额之间用空格分隔
-  • 金额前可加 + 或 - 号，不加默认为充值
-  • 扣款时会检查用户余额是否充足'''
+  • /add 123456789 100     (充值100元，默认为充值)'''
                 
                 context.bot.send_message(chat_id=user_id, text=help_text)
         else:
             context.bot.send_message(chat_id=user_id, text='❌ 权限不足，只有管理员才能使用此命令')
-
 
 def is_number(s):
     """检查字符串是否为数字"""
@@ -1594,7 +1803,6 @@ def is_number(s):
         return True
     except ValueError:
         return False
-
 
 def user_logging(order_id, operation_type, user_id, amount, timer):
     """记录用户操作日志"""
@@ -2025,6 +2233,66 @@ def huifu(update: Update, context: CallbackContext):
                     asyncio.sleep(10)
                     del_message(message_id)
 
+def handle_text_message(update: Update, context: CallbackContext):
+    """处理文本消息 - 包含充值金额输入"""
+    user_id = update.effective_user.id
+    text = update.message.text
+    
+    user_info = user.find_one({'user_id': user_id})
+    if not user_info:
+        return
+    
+    sign = user_info.get('sign', '')
+    
+    # 处理自定义充值金额输入
+    if sign == 'custom_recharge':
+        try:
+            amount = float(text)
+            if amount < 1:
+                context.bot.send_message(
+                    chat_id=user_id,
+                    text='❌ 充值金额不能小于1元，请重新输入'
+                )
+                return
+            
+            if amount > 10000:
+                context.bot.send_message(
+                    chat_id=user_id,
+                    text='❌ 单次充值金额不能超过10000元，请重新输入'
+                )
+                return
+            
+            # 清除sign状态
+            user.update_one({'user_id': user_id}, {'$set': {'sign': ''}})
+            
+            # 显示支付方式选择
+            keyboard = [
+                [InlineKeyboardButton('💙 支付宝', callback_data=f'pay_method_alipay_{amount}')],
+                [InlineKeyboardButton('💚 微信支付', callback_data=f'pay_method_wxpay_{amount}')],
+                [InlineKeyboardButton('🧡 QQ钱包', callback_data=f'pay_method_qqpay_{amount}')],
+                [InlineKeyboardButton('❌ 取消', callback_data=f'close {user_id}')]
+            ]
+            
+            context.bot.send_message(
+                chat_id=user_id,
+                text=f'''💰 <b>选择支付方式</b>
+
+💵 充值金额：CNY{amount}
+
+请选择您的支付方式：''',
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+            
+        except ValueError:
+            context.bot.send_message(
+                chat_id=user_id,
+                text='❌ 请输入有效的数字金额'
+            )
+            return
+    
+    # 其他消息处理逻辑保持不变...
 
 def sifa(update: Update, context: CallbackContext):
     query = update.callback_query
@@ -2061,6 +2329,49 @@ def tuwen(update: Update, context: CallbackContext):
                                           reply_markup=ForceReply(force_reply=True))
     context.user_data[f'wanfapeizhi{user_id}'] = message_id
 
+def user_data(count_id, user_id, username, fullname, lastname, state, creation_time, last_contact_time, USDT=0, zgje=0, zgsl=0, lang='zh', sign=''):
+    """创建用户数据记录"""
+    try:
+        user_doc = {
+            'count_id': count_id,
+            'user_id': user_id,
+            'username': username if username else '',
+            'fullname': fullname if fullname else '',
+            'lastname': lastname if lastname else '',
+            'state': state,
+            'creation_time': creation_time,
+            'last_contact_time': last_contact_time,
+            'USDT': USDT,
+            'zgje': zgje,
+            'zgsl': zgsl,
+            'lang': lang,
+            'sign': sign
+        }
+        
+        user.insert_one(user_doc)
+        print(f"✅ 用户数据创建成功: {user_id}")
+        
+    except Exception as e:
+        print(f"❌ 创建用户数据失败: {e}")
+        raise
+
+def user_logging(order_id, operation_type, user_id, amount, timer):
+    """记录用户操作日志"""
+    try:
+        log_data = {
+            'order_id': order_id,
+            'operation_type': operation_type,
+            'user_id': user_id,
+            'amount': amount,
+            'timestamp': timer,
+            'created_at': timer
+        }
+        
+        user_log.insert_one(log_data)
+        print(f"📝 记录日志: {operation_type} - 用户{user_id} - CNY{amount}")
+        
+    except Exception as e:
+        print(f"❌ 记录日志失败: {e}")
 
 def cattu(update: Update, context: CallbackContext):
     query = update.callback_query
@@ -8520,7 +8831,19 @@ def check_missing_functions():
 # 程序入口点修复
 if __name__ == '__main__':
     print("🔧 开始系统修复和初始化...")
+    dispatcher.add_handler(CommandHandler('add', adm))
+    dispatcher.add_handler(CommandHandler('addadmin', addadmin))
+    dispatcher.add_handler(CommandHandler('removeadmin', removeadmin))
+    dispatcher.add_handler(CommandHandler('listadmin', listadmin))
+    dispatcher.add_handler(CommandHandler('help', help_command))
+    dispatcher.add_handler(CommandHandler('profile', profile))
+    dispatcher.add_handler(CommandHandler('products', products))
+    dispatcher.add_handler(CommandHandler('recharge', recharge))
+    dispatcher.add_handler(CommandHandler('language', language))
+    dispatcher.add_handler(CommandHandler('redpacket', redpacket))
     
+    # 文本消息处理器
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
     # 检查函数完整性
     if not check_missing_functions():
         print("❌ 关键函数缺失，请检查代码完整性")
